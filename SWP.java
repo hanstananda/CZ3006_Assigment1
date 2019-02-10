@@ -121,6 +121,17 @@ public class SWP {
 
 	public void protocol6() {
 		init();
+		int seq_nr_ack_expected; /* lower edge of sender's window */
+		int seq_nr_next_frame_to_send /* upper edge of sender's windo+1 */
+		int seq_nr_frame_expected /* lower edge of receiver's window */
+		int seq_nr_too_far /* upper edge of receier's window +1 */
+		int index /* index to buffer pool*/
+		PFrame R = new PFrame();
+		Packet out_buf[NR_BUFS];
+		Packet in_buf[NR_BUFS];
+		boolean arrived[NR_BUFS];
+		int seq_nr_buffered;
+
 		while(true) {
 			wait_for_event(event);
 			switch(event.type) {
