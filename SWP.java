@@ -80,6 +80,7 @@ public class SWP {
 /*===========================================================================*
  	implement your Protocol Variables and Methods below: 
  *==========================================================================*/
+	private boolean no_nak = true;
 
 	static boolean between(int seq_nr_a, int seq_nr_b, int seq_nr_c)
 	{
@@ -90,6 +91,31 @@ public class SWP {
 			return(true);
 		else
 			return(false);
+	}
+
+	static void send_frame(int frame_type, int frame_nr, int frame_expected_nr, Packet buffer[])
+	{
+		/* Scratch variable */
+		PFrame s = new PFrame();
+		s.kind = frame_type;
+		if (frame_type == PFRAME.data)
+		{
+			s.info = buffer[frame_nr % NR_BUFS];
+		}
+		s.seq = frame_nr;
+		s.ack = (frame_expected_nr + MAX_SEQ) % (MAX_SEQ + 1);
+		if(frame_type == PFrame.NAK ) {
+			no_nak = false;
+		}
+
+		to_physical_layer(s);
+
+		if( frame_type == PFrame.DATA)
+		{
+			startTimer(frame_nr % NR_BUFS);
+		}
+
+		stop_ack_timer();
 	}
 
 
