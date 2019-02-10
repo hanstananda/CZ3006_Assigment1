@@ -81,6 +81,16 @@ public class SWP {
  	implement your Protocol Variables and Methods below: 
  *==========================================================================*/
 
+	static boolean between(int seq_nr_a, int seq_nr_b, int seq_nr_c)
+	{
+		/*
+		Return true if a <=b < c circularly; false otherwise.
+		*/
+		if (((seq_nr_a <= seq_nr_b) && (seq_nr_b < seq_nr_c)) || ((seq_nr_c < seq_nr_a) && (seq_nr_a <= seq_nr_b)) || ((seq_nr_b < seq_nr_c) && (seq_nr_c < seq_nr_a)))
+			return(true);
+		else
+			return(false);
+	}
 
 
 	public void protocol6() {
