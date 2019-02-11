@@ -257,7 +257,6 @@ public class SWP {
         try {
             ack_timer.cancel();
         } catch (Exception e) {
-//            System.out.println("Failed to stop the acknowledge timer");
         }
     }
 
@@ -265,8 +264,6 @@ public class SWP {
         try {
             timers[var1 % NR_BUFS].cancel();
         } catch (Exception e) {
-//            e.printStackTrace();
-            //System.out.println("Failed to stop timer");
         }
     }
 
