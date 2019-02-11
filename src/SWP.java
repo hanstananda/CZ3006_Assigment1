@@ -80,7 +80,7 @@ public class SWP {
     /*===========================================================================*
 		 implement your Protocol Variables and Methods below:
 	 *==========================================================================*/
-    private boolean no_nak = true;
+    static boolean no_nak = true;
 
     static boolean between(int seq_nr_a, int seq_nr_b, int seq_nr_c)
     {
@@ -93,12 +93,12 @@ public class SWP {
             return(false);
     }
 
-    static void send_frame(int frame_type, int frame_nr, int frame_expected_nr, Packet buffer[])
+    private void send_frame(int frame_type, int frame_nr, int frame_expected_nr, Packet buffer[])
     {
         /* Scratch variable */
         PFrame s = new PFrame();
         s.kind = frame_type;
-        if (frame_type == PFRAME.data)
+        if (frame_type == PFrame.DATA)
         {
             s.info = buffer[frame_nr % NR_BUFS];
         }
@@ -112,7 +112,7 @@ public class SWP {
 
         if( frame_type == PFrame.DATA)
         {
-            startTimer(frame_nr % NR_BUFS);
+            start_timer(frame_nr % NR_BUFS);
         }
 
         stop_ack_timer();
@@ -121,16 +121,30 @@ public class SWP {
 
     public void protocol6() {
         init();
+
+        // Parameter declaration
         int seq_nr_ack_expected; /* lower edge of sender's window */
-        int seq_nr_next_frame_to_send /* upper edge of sender's windo+1 */
-        int seq_nr_frame_expected /* lower edge of receiver's window */
-        int seq_nr_too_far /* upper edge of receier's window +1 */
-        int index /* index to buffer pool*/
+        int seq_nr_next_frame_to_send; /* upper edge of sender's windo+1 */
+        int seq_nr_frame_expected; /* lower edge of receiver's window */
+        int seq_nr_too_far; /* upper edge of receier's window +1 */
+        int index; /* index to buffer pool*/
         PFrame R = new PFrame();
-        Packet out_buf[NR_BUFS];
-        Packet in_buf[NR_BUFS];
-        boolean arrived[NR_BUFS];
+        boolean arrived[] = new boolean[NR_BUFS];
         int seq_nr_buffered;
+
+        // Initialize Network Layer
+        enable_network_layer(NR_BUFS);
+
+        // Parameter value initialization
+        seq_nr_ack_expected = 0;
+        seq_nr_next_frame_to_send =0;
+        seq_nr_frame_expected =0;
+        seq_nr_too_far = NR_BUFS;
+        seq_nr_buffered = 0;
+
+        for(int i =0;i<NR_BUFS;i++) {
+            arrived[i] = false;
+        }
 
         while(true) {
             wait_for_event(event);
