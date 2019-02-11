@@ -82,6 +82,11 @@ public class SWP {
 	 *==========================================================================*/
     static boolean no_nak = true;
 
+    // This method increments an integer while making sure it falls within the range of the max sequence number
+    public static int increment(int n) {
+        return (n+1)%(MAX_SEQ+1);
+    }
+
     static boolean between(int seq_nr_a, int seq_nr_b, int seq_nr_c)
     {
 		/*
@@ -128,16 +133,16 @@ public class SWP {
         int seq_nr_frame_expected; /* lower edge of receiver's window */
         int seq_nr_too_far; /* upper edge of receier's window +1 */
         int index; /* index to buffer pool*/
-        PFrame R = new PFrame();
-        boolean arrived[] = new boolean[NR_BUFS];
-        int seq_nr_buffered;
+        PFrame R = new PFrame(); /* scratch variable */
+        boolean arrived[] = new boolean[NR_BUFS]; /* inbound bit map */
+        int seq_nr_buffered; /* how many output buffers currently used */
 
         // Initialize Network Layer
         enable_network_layer(NR_BUFS);
 
         // Parameter value initialization
-        seq_nr_ack_expected = 0;
-        seq_nr_next_frame_to_send =0;
+        seq_nr_ack_expected = 0; /* next ack expected on the inbound stream */
+        seq_nr_next_frame_to_send =0; /* number of next outgoing frame */
         seq_nr_frame_expected =0;
         seq_nr_too_far = NR_BUFS;
         seq_nr_buffered = 0;
@@ -149,7 +154,17 @@ public class SWP {
         while(true) {
             wait_for_event(event);
             switch(event.type) {
-                case (PEvent.NETWORK_LAYER_READY):
+                case (PEvent.NETWORK_LAYER_READY): /* accept, save, and transmit a new frame */
+                    // expand the window
+                    seq_nr_buffered ++;
+
+                    //fetch network package from network layer
+                    from_network_layer(out_buf[seq_nr_next_frame_to_send % NR_BUFS]);
+
+                    //transmit the frame
+                    send_frame(PFrame.DATA, seq_nr_next_frame_to_send, seq_nr_frame_expected, out_buf);
+
+                    increment(seq_nr_next_frame_to_send);
                     break;
                 case (PEvent.FRAME_ARRIVAL ):
                     break;
