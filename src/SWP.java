@@ -71,6 +71,7 @@ public class SWP {
 		 implement your Protocol Variables and Methods below:
 	 *==========================================================================*/
     private boolean no_nak = true;
+    private Packet in_buf[] = new Packet[NR_BUFS];
     private Timer[] timers = new Timer[NR_BUFS];
     private Timer ack_timer = new Timer();
     private static final int TIMEOUT_INTERVAL = 500;
@@ -128,7 +129,7 @@ public class SWP {
         int seq_nr_frame_expected; /* lower edge of receiver's window */
         int seq_nr_too_far; /* upper edge of receier's window +1 */
         int index; /* index to buffer pool*/
-        PFrame R = new PFrame(); /* scratch variable */
+        PFrame r = new PFrame(); /* scratch variable */
         boolean arrived[] = new boolean[NR_BUFS]; /* inbound bit map */
         int seq_nr_buffered; /* how many output buffers currently used */
 
@@ -159,15 +160,72 @@ public class SWP {
                     //transmit the frame
                     send_frame(PFrame.DATA, seq_nr_next_frame_to_send, seq_nr_frame_expected, out_buf);
 
-                    increment(seq_nr_next_frame_to_send);
+                    seq_nr_next_frame_to_send = increment(seq_nr_next_frame_to_send);
                     break;
-                case (PEvent.FRAME_ARRIVAL ):
+                case (PEvent.FRAME_ARRIVAL ): // A data or control frame has arrived
+                    // fetch incoming frame from physical layer
+                    from_physical_layer(r);
+                    if(r.kind==PFrame.DATA) {
+
+                        // An undamaged frame has arrived
+                        if ((r.seq != seq_nr_frame_expected) && no_nak) {
+                            send_frame(PFrame.NAK, 0, seq_nr_frame_expected, out_buf);
+                        } else {
+                            // Start ACK timer to retransmit ACK to sender when timer timeout
+                            start_ack_timer();
+                        }
+
+                        // Check if frame received within sliding window range & whether it has been received before
+
+                        if (between(seq_nr_frame_expected, r.seq, seq_nr_too_far) && arrived[r.seq % NR_BUFS] == false) {
+                            //Frames may be accepted in any order
+                            arrived[r.seq % NR_BUFS] = true; // mark buffer as full
+                            in_buf[r.seq % NR_BUFS] = r.info; // insert data to buffer
+                            while (arrived[seq_nr_frame_expected % NR_BUFS]) {
+                                //Pass frames and advance window
+                                to_network_layer(in_buf[seq_nr_frame_expected % NR_BUFS]);
+                                no_nak = true;
+                                arrived[seq_nr_frame_expected % NR_BUFS] = false;
+
+                                // advance lower edge of receiver's window
+                                seq_nr_frame_expected = increment(seq_nr_frame_expected);
+
+                                // advance upper edge of receiver's window
+                                seq_nr_too_far = increment(seq_nr_too_far);
+
+                                // to see if a separate ack is needed
+                                start_ack_timer();
+
+                            }
+                        }
+                    }
+                    if(r.kind==PFrame.NAK && between(seq_nr_ack_expected, increment(r.ack), seq_nr_next_frame_to_send))
+                    {
+                        // If NAK frame arrives, and it is between sliding window range
+                        send_frame(PFrame.DATA, increment(r.ack), seq_nr_frame_expected, out_buf);
+                        // Note: increment() does not actually increase the value! it essentially just return the value
+                    }
+                    while(between(seq_nr_ack_expected,r.ack,seq_nr_next_frame_to_send))
+                    {
+                        seq_nr_buffered--; // handle piggybacked ack
+                        stop_timer(seq_nr_ack_expected % NR_BUFS);
+                        increment(seq_nr_ack_expected); // advance lower edge of sender's window
+                        // Free up 1 buffer slot(?)
+                        enable_network_layer(1);
+                    }
                     break;
-                case (PEvent.CKSUM_ERR):
+                case (PEvent.CKSUM_ERR):  // Damaged frame arrived
+                    if(no_nak)
+                    {
+                        // Send NAK if it is not sent yet
+                        send_frame(PFrame.NAK,0,seq_nr_frame_expected, out_buf);
+                    }
                     break;
-                case (PEvent.TIMEOUT):
+                case (PEvent.TIMEOUT): // we timed out
+                    send_frame(PFrame.DATA, oldest_frame, seq_nr_frame_expected, out_buf);
                     break;
-                case (PEvent.ACK_TIMEOUT):
+                case (PEvent.ACK_TIMEOUT): // ack timer expired, send ack instead of wait to be piggybacked
+                    send_frame(PFrame.ACK, 0, seq_nr_frame_expected, out_buf);
                     break;
                 default:
                     System.out.println("SWP: undefined event type = "
