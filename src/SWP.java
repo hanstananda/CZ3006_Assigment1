@@ -3,68 +3,176 @@ import java.util.TimerTask;
 
 
 public class SWP {
+    /*========================================================================*
+         the following are provided, do not change them!!
+         *========================================================================*/
+    //the following are protocol constants.
     public static final int MAX_SEQ = 7;
-    public static final int NR_BUFS = (MAX_SEQ + 1) / 2;
+    public static final int NR_BUFS = (MAX_SEQ + 1)/2;
+
+    // the following are protocol variables
     private int oldest_frame = 0;
     private PEvent event = new PEvent();
-    private Packet[] out_buf = new Packet[NR_BUFS];
+    private Packet out_buf[] = new Packet[NR_BUFS];
+
+    //the following are used for simulation purpose only
     private SWE swe = null;
     private String sid = null;
 
-    // protocol related variables
+    //Constructor
+    public SWP(SWE sw, String s){
+        swe = sw;
+        sid = s;
+    }
+
+    //the following methods are all protocol related
+    private void init(){
+        for (int i = 0; i < NR_BUFS; i++){
+            out_buf[i] = new Packet();
+        }
+    }
+
+    private void wait_for_event(PEvent e){
+        swe.wait_for_event(e); //may be blocked
+        oldest_frame = e.seq;  //set timeout frame seq
+    }
+
+    private void enable_network_layer(int nr_of_bufs) {
+        //network layer is permitted to send if credit is available
+        swe.grant_credit(nr_of_bufs);
+    }
+
+    private void from_network_layer(Packet p) {
+        swe.from_network_layer(p);
+    }
+
+    private void to_network_layer(Packet packet) {
+        swe.to_network_layer(packet);
+    }
+
+    private void to_physical_layer(PFrame fm)  {
+        System.out.println("SWP: Sending frame: seq = " + fm.seq +
+                " ack = " + fm.ack + " kind = " +
+                PFrame.KIND[fm.kind] + " info = " + fm.info.data );
+        System.out.flush();
+        swe.to_physical_layer(fm);
+    }
+
+    private void from_physical_layer(PFrame fm) {
+        PFrame fm1 = swe.from_physical_layer();
+        fm.kind = fm1.kind;
+        fm.seq = fm1.seq;
+        fm.ack = fm1.ack;
+        fm.info = fm1.info;
+    }
+
+
+    /*===========================================================================*
+		 implement your Protocol Variables and Methods below:
+	 *==========================================================================*/
     private boolean no_nak = true;
-    // timer related variables and constants
     private Timer[] timers = new Timer[NR_BUFS];
     private Timer ack_timer = new Timer();
     private static final int TIMEOUT_INTERVAL = 500;
     private static final int ACK_TIMEOUT_INTERVAL = 300;
 
-    public SWP(SWE var1, String var2) {
-        this.swe = var1;
-        this.sid = var2;
+    // This method increments an integer while making sure it falls within the range of the max sequence number
+    public static int increment(int n) {
+        return (n+1)%(MAX_SEQ+1);
     }
 
-    private void enable_network_layer(int var1) {
-        this.swe.grant_credit(var1);
+    static boolean between(int seq_nr_a, int seq_nr_b, int seq_nr_c)
+    {
+		/*
+		Return true if a <=b < c circularly; false otherwise.
+		*/
+        if (((seq_nr_a <= seq_nr_b) && (seq_nr_b < seq_nr_c)) || ((seq_nr_c < seq_nr_a) && (seq_nr_a <= seq_nr_b)) || ((seq_nr_b < seq_nr_c) && (seq_nr_c < seq_nr_a)))
+            return(true);
+        else
+            return(false);
     }
 
-    private void from_network_layer(Packet var1) {
-        this.swe.from_network_layer(var1);
-    }
-
-    private void from_physical_layer(PFrame var1) {
-        PFrame var2 = this.swe.from_physical_layer();
-        var1.kind = var2.kind;
-        var1.seq = var2.seq;
-        var1.ack = var2.ack;
-        var1.info = var2.info;
-    }
-
-    private void init() {
-        for(int var1 = 0; var1 < 4; ++var1) {
-            this.out_buf[var1] = new Packet();
+    private void send_frame(int frame_type, int frame_nr, int frame_expected_nr, Packet buffer[])
+    {
+        /* Scratch variable */
+        PFrame s = new PFrame();
+        s.kind = frame_type;
+        if (frame_type == PFrame.DATA)
+        {
+            s.info = buffer[frame_nr % NR_BUFS];
+        }
+        s.seq = frame_nr;
+        s.ack = (frame_expected_nr + MAX_SEQ) % (MAX_SEQ + 1);
+        if(frame_type == PFrame.NAK ) {
+            no_nak = false;
         }
 
+        to_physical_layer(s);
+
+        if( frame_type == PFrame.DATA)
+        {
+            start_timer(frame_nr % NR_BUFS);
+        }
+
+        stop_ack_timer();
     }
+
 
 
     public void protocol6() {
-        this.init();
+        init();
+
+        // Parameter declaration
+        int seq_nr_ack_expected; /* lower edge of sender's window */
+        int seq_nr_next_frame_to_send; /* upper edge of sender's windo+1 */
+        int seq_nr_frame_expected; /* lower edge of receiver's window */
+        int seq_nr_too_far; /* upper edge of receier's window +1 */
+        int index; /* index to buffer pool*/
+        PFrame R = new PFrame(); /* scratch variable */
+        boolean arrived[] = new boolean[NR_BUFS]; /* inbound bit map */
+        int seq_nr_buffered; /* how many output buffers currently used */
+
+        // Initialize Network Layer
+        enable_network_layer(NR_BUFS);
+
+        // Parameter value initialization
+        seq_nr_ack_expected = 0; /* next ack expected on the inbound stream */
+        seq_nr_next_frame_to_send =0; /* number of next outgoing frame */
+        seq_nr_frame_expected =0;
+        seq_nr_too_far = NR_BUFS;
+        seq_nr_buffered = 0;
+
+        for(int i =0;i<NR_BUFS;i++) {
+            arrived[i] = false;
+        }
 
         while(true) {
-            while(true) {
-                this.wait_for_event(this.event);
-                switch(this.event.type) {
-                    case 0:
-                    case 1:
-                    case 2:
-                    case 3:
-                    case 4:
-                        break;
-                    default:
-                        System.out.println("SWP: undefined event type = " + this.event.type);
-                        System.out.flush();
-                }
+            wait_for_event(event);
+            switch(event.type) {
+                case (PEvent.NETWORK_LAYER_READY): /* accept, save, and transmit a new frame */
+                    // expand the window
+                    seq_nr_buffered ++;
+
+                    //fetch network package from network layer
+                    from_network_layer(out_buf[seq_nr_next_frame_to_send % NR_BUFS]);
+
+                    //transmit the frame
+                    send_frame(PFrame.DATA, seq_nr_next_frame_to_send, seq_nr_frame_expected, out_buf);
+
+                    increment(seq_nr_next_frame_to_send);
+                    break;
+                case (PEvent.FRAME_ARRIVAL ):
+                    break;
+                case (PEvent.CKSUM_ERR):
+                    break;
+                case (PEvent.TIMEOUT):
+                    break;
+                case (PEvent.ACK_TIMEOUT):
+                    break;
+                default:
+                    System.out.println("SWP: undefined event type = "
+                            + event.type);
+                    System.out.flush();
             }
         }
     }
@@ -102,21 +210,6 @@ public class SWP {
         }
     }
 
-    private void to_network_layer(Packet var1) {
-        this.swe.to_network_layer(var1);
-    }
-
-    private void to_physical_layer(PFrame var1) {
-        System.out.println("SWP: Sending frame: seq = " + var1.seq + " ack = " + var1.ack + " kind = " + PFrame.KIND[var1.kind] + " info = " + var1.info.data);
-        System.out.flush();
-        this.swe.to_physical_layer(var1);
-    }
-
-    private void wait_for_event(PEvent var1) {
-        this.swe.wait_for_event(var1);
-        this.oldest_frame = var1.seq;
-    }
-
     // Helper class for implementing timer
     private class ProtocolTimerTask extends TimerTask {
         public int seq; // add an attribute seq to record the sequence number
@@ -133,3 +226,14 @@ public class SWP {
         }
     }
 }
+//End of class
+
+/* Note: In class SWE, the following two public methods are available:
+   . generate_acktimeout_event() and
+   . generate_timeout_event(seqnr).
+
+   To call these two methods (for implementing timers),
+   the "swe" object should be referred as follows:
+     swe.generate_acktimeout_event(), or
+     swe.generate_timeout_event(seqnr).
+*/
