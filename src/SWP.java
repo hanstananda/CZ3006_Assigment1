@@ -236,54 +236,78 @@ public class SWP {
     private void start_ack_timer() {
         stop_ack_timer();
         ack_timer = new Timer();
-        ack_timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                swe.generate_acktimeout_event();
-            }
-        }, ACK_TIMEOUT_INTERVAL);
+        // Creates a new ACK task for the timer
+        ATask AT = new ATask(swe);
+
+        // Schedule the task in the timer
+        ack_timer.schedule(AT, 100);
     }
 
-    private void start_timer(int var1) {
-        System.out.println(var1);
-        stop_timer(var1);
-        timers[var1 % NR_BUFS] = new Timer();
-        timers[var1 % NR_BUFS].schedule(new ProtocolTimerTask(var1), TIMEOUT_INTERVAL);
+    private void start_timer(int seq) {
+        stop_timer(seq);
+
+        timers[seq % NR_BUFS] = new Timer();
+
+        // Creates a new retransmission task for the timer
+        RTask RT = new RTask(swe, seq);
+
+        // Schedule the task in the timer
+        timers[seq % NR_BUFS].schedule(RT, 200);
     }
 
     private void stop_ack_timer() {
-        try {
+        if (ack_timer != null) {
+            // Stop the timer and remove the scheduled task
             ack_timer.cancel();
-        } catch (Exception e) {
-//            System.out.println("Failed to stop the acknowledge timer");
         }
     }
 
-    private void stop_timer(int var1) {
-        try {
-            timers[var1 % NR_BUFS].cancel();
-        } catch (Exception e) {
-//            e.printStackTrace();
-            //System.out.println("Failed to stop timer");
+    private void stop_timer(int seq) {
+        if (timers[seq % NR_BUFS] != null) {
+            timers[seq % NR_BUFS].cancel();
         }
     }
 
     // Helper class for implementing timer
-    private class ProtocolTimerTask extends TimerTask {
-        public int seq; // add an attribute seq to record the sequence number
+    // Timer for DATA retransmission
+    class RTask extends TimerTask {
+        private SWE swe = null;
+        public int seqnr;
 
-        public ProtocolTimerTask(int seq) {
-            super();
-            this.seq = seq;
+        // Create a DATA retransmission task object
+        public RTask(SWE swe, int seqnr) {
+            this.swe = swe;
+            this.seqnr = seqnr;
         }
 
-        // generate a timeout event of the recorded sequence number when the task is executed
-        @Override
         public void run() {
-            swe.generate_timeout_event(this.seq);
+            // Stop the timer
+            stop_timer(seqnr);
+
+            // Generate a timeout event on the SWE
+            swe.generate_timeout_event(seqnr);
+        }
+    }
+
+    // Timer for ACK retransmission
+    class ATask extends TimerTask {
+        private SWE swe = null;
+
+        // Create a ACK retransmission task object
+        public ATask(SWE swe) {
+            this.swe = swe;
+        }
+
+        public void run() {
+            // Stop the timer
+            stop_ack_timer();
+
+            // Generate a timeout event on the SWE
+            swe.generate_acktimeout_event();
         }
     }
 }
+
 //End of class
 
 /* Note: In class SWE, the following two public methods are available:
