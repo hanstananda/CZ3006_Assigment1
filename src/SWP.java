@@ -264,7 +264,8 @@ public class SWP {
         try {
             timers[var1 % NR_BUFS].cancel();
         } catch (Exception e) {
-            System.out.println("Failed to stop timer");
+            e.printStackTrace();
+            //System.out.println("Failed to stop timer");
         }
     }
 
