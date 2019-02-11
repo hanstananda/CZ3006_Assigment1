@@ -112,7 +112,7 @@ public class SWP {
 
         if( frame_type == PFrame.DATA)
         {
-            start_timer(frame_nr % NR_BUFS);
+            start_timer(frame_nr);
         }
 
         stop_ack_timer();
