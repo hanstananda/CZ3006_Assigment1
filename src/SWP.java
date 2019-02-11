@@ -103,7 +103,7 @@ public class SWP {
             s.info = buffer[frame_nr % NR_BUFS];
         }
         s.seq = frame_nr;
-        s.ack = (frame_expected_nr + MAX_SEQ) % (MAX_SEQ + 1);
+        s.ack = (frame_expected_nr+ MAX_SEQ) %(MAX_SEQ+1);
         if(frame_type == PFrame.NAK ) {
             no_nak = false;
         }
@@ -209,7 +209,7 @@ public class SWP {
                     {
                         seq_nr_buffered--; // handle piggybacked ack
                         stop_timer(seq_nr_ack_expected % NR_BUFS);
-                        increment(seq_nr_ack_expected); // advance lower edge of sender's window
+                        seq_nr_ack_expected = increment(seq_nr_ack_expected); // advance lower edge of sender's window
                         // Free up 1 buffer slot(?)
                         enable_network_layer(1);
                     }
@@ -247,6 +247,7 @@ public class SWP {
     }
 
     private void start_timer(int var1) {
+        System.out.println(var1);
         stop_timer(var1);
         timers[var1 % NR_BUFS] = new Timer();
         timers[var1 % NR_BUFS].schedule(new ProtocolTimerTask(var1), TIMEOUT_INTERVAL);
@@ -256,7 +257,7 @@ public class SWP {
         try {
             ack_timer.cancel();
         } catch (Exception e) {
-            System.out.println("Failed to stop the acknowledge timer");
+//            System.out.println("Failed to stop the acknowledge timer");
         }
     }
 
@@ -264,7 +265,7 @@ public class SWP {
         try {
             timers[var1 % NR_BUFS].cancel();
         } catch (Exception e) {
-            e.printStackTrace();
+//            e.printStackTrace();
             //System.out.println("Failed to stop timer");
         }
     }
