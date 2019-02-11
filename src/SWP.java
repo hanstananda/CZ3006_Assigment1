@@ -112,7 +112,7 @@ public class SWP {
 
         if( frame_type == PFrame.DATA)
         {
-            start_timer(frame_nr % NR_BUFS);
+            start_timer(frame_nr);
         }
 
         stop_ack_timer();
@@ -128,7 +128,6 @@ public class SWP {
         int seq_nr_next_frame_to_send; /* upper edge of sender's windo+1 */
         int seq_nr_frame_expected; /* lower edge of receiver's window */
         int seq_nr_too_far; /* upper edge of receier's window +1 */
-        int index; /* index to buffer pool*/
         PFrame r = new PFrame(); /* scratch variable */
         boolean arrived[] = new boolean[NR_BUFS]; /* inbound bit map */
         int seq_nr_buffered; /* how many output buffers currently used */
@@ -207,7 +206,6 @@ public class SWP {
                     }
                     while(between(seq_nr_ack_expected,r.ack,seq_nr_next_frame_to_send))
                     {
-                        seq_nr_buffered--; // handle piggybacked ack
                         stop_timer(seq_nr_ack_expected % NR_BUFS);
                         seq_nr_ack_expected = increment(seq_nr_ack_expected); // advance lower edge of sender's window
                         // Free up 1 buffer slot(?)
