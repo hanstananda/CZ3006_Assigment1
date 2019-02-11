@@ -244,11 +244,10 @@ public class SWP {
         }, ACK_TIMEOUT_INTERVAL);
     }
 
-    private void start_timer(int var1) {
-        System.out.println(var1);
-        stop_timer(var1);
-        timers[var1 % NR_BUFS] = new Timer();
-        timers[var1 % NR_BUFS].schedule(new ProtocolTimerTask(var1), TIMEOUT_INTERVAL);
+    private void start_timer(int seq) {
+        stop_timer(seq);
+        timers[seq % NR_BUFS] = new Timer();
+        timers[seq % NR_BUFS].schedule(new ProtocolTimerTask(seq), TIMEOUT_INTERVAL);
     }
 
     private void stop_ack_timer() {
@@ -258,9 +257,9 @@ public class SWP {
         }
     }
 
-    private void stop_timer(int var1) {
+    private void stop_timer(int seq) {
         try {
-            timers[var1 % NR_BUFS].cancel();
+            timers[seq % NR_BUFS].cancel();
         } catch (Exception e) {
         }
     }
